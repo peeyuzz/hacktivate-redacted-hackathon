@@ -2,130 +2,122 @@ import fitz
 import re
 import pytesseract
 from PIL import Image
-import io
 import os
+import json
+import google.generativeai as genai
+from google.generativeai import GenerativeModel
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_KEY = os.environ["API_KEY"]
+genai.configure(api_key=API_KEY)
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
 
 class Redactor:
     # Class variables for regex patterns
-    EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-    PHONE_PATTERN = r'\b(\+?\d{1,4}[\s-]?)?(?!0+\b)\d{10}\b'
-    # NAME_PATTERN = r'\b[A-Z][a-z]+\s[A-Z][a-z]+\b'
-    NAME_PATTERN = r'Netaji'
+    EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+    PHONE_PATTERN = r'\b(?:\+?\d{1,4}[\s-]?)?(?!0+\b)\d{10}\b'
+    AADHAR_PATTERN = r'[2-9]\d{3}\s?-?\d{4}\s?-?\d{4}'
+    PASSPORT_PATTERN = r'\b[A-PR-WY][1-9]\d{7}\b'  
+    PAN_PATTERN = r'\b[A-Z]{5}[0-9]{4}[A-Z]\b'
+    BANK_ACC_PATTERN = r'\b\d{9,18}\b'
 
     def __init__(self, path):
         self.path = path
         self.texts = ""
-        self.t_blocks = None
-        self.print_area = None
-        self.use_ocr = True
         self.sensitive_datas = []
     
-    @staticmethod
-    def get_sensitive_data(text):
+    def get_sensitive_data(self, text, use_gemini=False):
         """Function to get all sensitive data"""
         sensitive_data = []
-        patterns = [Redactor.EMAIL_PATTERN, Redactor.PHONE_PATTERN, Redactor.NAME_PATTERN]
-        
-        for pattern in patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            sensitive_data.extend([match.group() for match in matches])
+
+        patterns = [
+            self.EMAIL_PATTERN,
+            self.PHONE_PATTERN,
+            self.AADHAR_PATTERN,
+            self.PASSPORT_PATTERN,
+            self.PAN_PATTERN,
+            self.BANK_ACC_PATTERN
+        ]
+
+        if use_gemini:
+            with open('prompt.txt', 'r', encoding='utf-8') as file:
+                prompt = file.read()
+            model = genai.GenerativeModel("gemini-1.5-flash")   
+            response = model.generate_content(
+                f"<DOCUMENT>\n{text}\n</DOCUMENT>\n\n{prompt}",
+                safety_settings={
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                })
+            try:
+                # Assuming `response` is your API response object
+                sensitive_data.extend(json.loads(response.text))  # Assuming the response is a list of dicts
+
+            except json.JSONDecodeError as ve:
+                print(f"Error: {ve}")
+                # Handle the error, e.g., log it or notify the user
+        else:
+            for pattern in patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                sensitive_data.extend([{"text": match.group(), "reason": "regex match", "level": "medium"} for match in matches])
         
         return sensitive_data
 
     def get_text(self, page):
         text = page.get_text()
-        # If no text is found, perform OCR
         if not text.strip():
             pix = page.get_pixmap()
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             text = self.perform_ocr(img)
-
         return text
 
     def perform_ocr(self, image):
         """Perform OCR on the given image"""
-        return ' '.join(pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)['text'])
+        return pytesseract.image_to_string(image)
 
     def find_text_locations(self, page, sensitive_data):
         """Find the locations of sensitive data on the page."""
         locations = []
-        
-        # Iterate over each piece of sensitive data
         for data in sensitive_data:
-            # Using a custom search method to find the exact location of the text
-            text_instances = page.search_for(data)
-            
-            # If the search finds text instances, add them to locations
-            if not text_instances:
+            text_instances = page.search_for(data['text'])
+            if text_instances:
                 locations.extend(text_instances)
             else:
-                # Handle cases where the sensitive data is not found by the built-in search
-                # Iterate through all text blocks on the page to find potential matches
                 text_blocks = page.get_text("blocks")
-                # self.t_blocks = self.get_text(page)
-                self.t_blocks = text_blocks
                 for block in text_blocks:
                     block_text = block[4]
-                    if data in block_text:
-                        # Approximate the location by matching the text within the block
+                    if data['text'] in block_text:
                         block_rect = fitz.Rect(block[:4])
                         locations.append(block_rect)
-        
         return locations
 
-    def redact(self):
+    def redact(self, use_gemini=False):
         """Main redactor code"""
-        # Opening the PDF
         doc = fitz.open(self.path)
-        
-        # Iterating through pages
-        for page_num  in range(len(doc)):
-            page = doc.load_page(page_num)
-            # _wrapContents is needed for fixing alignment issues with rect boxes
+        for page in doc:
             page.wrap_contents()
-            # # Get the text content of the page (this will work for text-based PDFs)
-            text = page.get_text()
-            
-            # If no text is found, perform OCR
-            if not text.strip():
-                pix = page.get_pixmap()
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                text = self.perform_ocr(img)
-            
+            text = self.get_text(page)
             self.texts += text
-            # Getting the sensitive data
-            sensitive_data = self.get_sensitive_data(text)
+            sensitive_data = self.get_sensitive_data(text, use_gemini)
             self.sensitive_datas.extend(sensitive_data)
-            # First, try the built-in search function
-            # areas = [area for data in sensitive_data for area in page.search_for(data)]
             areas = self.find_text_locations(page, sensitive_data)
-
-            # If built-in search doesn't find all sensitive data, use our custom method
-            # if len(areas) < len(sensitive_data):
-            #     areas = self.find_text_locations(page, sensitive_data)
-            self.print_area = areas
-            # Drawing redaction annotations
             for area in areas:
                 page.add_redact_annot(area, fill=(0, 0, 0))
-            
-            # Applying the redactions
             page.apply_redactions()
         
-        # Constructing the output file path
         output_path = os.path.splitext(self.path)[0] + '_redacted.pdf'
-        # Saving it to a new PDF
         doc.save(output_path)
         print(f"Successfully redacted and saved as {output_path}")
+        return self.sensitive_datas
 
-# Driver code for testing
 if __name__ == "__main__":
-    # Replace it with the name of the PDF file
-    # path = r'tests\pdfs\Notice_Unauthorized_Freshers_Party.pdf'
-    path = r'tests\pdfs\peeyush_resume.pdf'
+    path = r'tests\pdfs\all_info.pdf'
     redactor = Redactor(path)
-    redactor.redact()
-    print(redactor.sensitive_datas)
-    print(redactor.print_area)
-    print(redactor.t_blocks)
+    sensitive_data = redactor.redact(use_gemini=True)
+    print(sensitive_data)
