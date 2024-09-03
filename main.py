@@ -10,14 +10,99 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from dotenv import load_dotenv
 import whisper
 from pydub import AudioSegment
+import cv2
+from openvino.runtime import Core
+import numpy as np
+import utils
 
 load_dotenv()
 
 API_KEY = os.environ["API_KEY"]
 genai.configure(api_key=API_KEY)
-
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
 
+
+class FaceDetector:
+    def __init__(self,
+                 model,
+                 confidence_thr=0.3,
+                 overlap_thr=0.7):
+        # load and compile the model
+        core = Core()
+        model = core.read_model(model=model)
+        compiled_model = core.compile_model(model=model)
+        self.model = compiled_model
+
+        # 'Cause that model has more than one output,
+        # We are saving the names in a more human frendly
+        # variable to remember later how to recover the output we wish
+        # In our case here, is a output for hte bbox and other for the score
+        # /confidence. Have a look at the openvino documentation for more i
+        self.output_scores_layer = self.model.output(0)
+        self.output_boxes_layer  = self.model.output(1)
+        # confidence threshold
+        self.confidence_thr = confidence_thr
+        # threshold for the nonmaximum suppression
+        self.overlap_thr = overlap_thr
+
+    def preprocess(self, image):
+        """
+            input image is a numpy array image representation,
+            in the BGR format of any shape.
+        """
+        # resize to match the expected by the model
+        input_image = cv2.resize(image, dsize=[320,240])
+        # changing from [H, W, C] to [C, H, W]. "channels first"
+        input_image = np.expand_dims(input_image.transpose(2,0,1), axis=0)
+        return input_image
+
+    def posprocess(self, pred_scores, pred_boxes, image_shape):
+        # get all predictions with more than confidence_thr of confidence
+        filtered_indexes = np.argwhere( pred_scores[0,:,1] > self.confidence_thr  ).tolist()
+        filtered_boxes   = pred_boxes[0,filtered_indexes,:]
+        filtered_scores  = pred_scores[0,filtered_indexes,1]
+
+        if len(filtered_scores) == 0:
+            return [],[]
+
+        # convert all boxes to image coordinates
+        h, w = image_shape
+        def _convert_bbox_format(*args):
+            bbox = args[0]
+            x_min, y_min, x_max, y_max = bbox
+            x_min = int(w*x_min)
+            y_min = int(h*y_min)
+            x_max = int(w*x_max)
+            y_max = int(h*y_max)
+            return x_min, y_min, x_max, y_max
+
+        bboxes_image_coord = np.apply_along_axis(_convert_bbox_format, axis = 2, arr=filtered_boxes)
+
+        # apply non-maximum supressions
+        bboxes_image_coord, indexes = utils.non_max_suppression(bboxes_image_coord.reshape([-1,4]),
+                                                                overlapThresh=self.overlap_thr)
+        filtered_scores = filtered_scores[indexes]
+        return bboxes_image_coord, filtered_scores
+
+    def draw_bboxes(self, image, bboxes, color=[0,255,0]):
+        # Just for visualization
+        # draw all bboxes on the input image
+        for boxe in bboxes:
+            x_min, y_min, x_max, y_max = boxe
+            pt1 = (x_min, y_min)
+            pt2 = (x_max, y_max)
+            cv2.rectangle(image, pt1, pt2, color=color, thickness=2, lineType=cv2.LINE_4)#BGR
+
+    def inference(self, image):
+        input_image = self.preprocess(image)
+        # inference
+        pred_scores = self.model( [input_image] )[self.output_scores_layer]
+        pred_boxes = self.model( [input_image] )[self.output_boxes_layer]
+
+        image_shape = image.shape[:2]
+        faces, scores = self.posprocess(pred_scores, pred_boxes, image_shape)
+        return faces, scores
+    
 class Redactor:
     # Class variables for regex patterns
     EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
@@ -32,6 +117,8 @@ class Redactor:
         self.texts = ""
         self.plan_type = plan_type
         self.sensitive_datas = []
+        self.face_detector = FaceDetector(model=r"model\public\ultra-lightweight-face-detection-rfb-320\FP16\ultra-lightweight-face-detection-rfb-320.xml")
+
     
     def get_sensitive_data(self, text):
         """Function to get all sensitive data"""
@@ -197,16 +284,88 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.wav'
         redacted_audio.export(output_path, format="wav")
         print(f"Successfully redacted and saved as {output_path}")
-    
+
+    def redact_image(self):
+        image = cv2.imread(self.path)
+        faces, _ = self.face_detector.inference(image)
+        
+        for face in faces:
+            x_min, y_min, x_max, y_max = face
+            cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
+        
+        output_path = os.path.splitext(self.path)[0] + '_redacted.jpg'
+        cv2.imwrite(output_path, image)
+        print(f"Successfully redacted image and saved as {output_path}")
+
+    def redact_video(self):
+        video = cv2.VideoCapture(self.path)
+        fps = video.get(cv2.CAP_PROP_FPS)
+        width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        
+        output_path = os.path.splitext(self.path)[0] + '_redacted.mp4'
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        while True:
+            ret, frame = video.read()
+            if not ret:
+                break
+            
+            faces, _ = self.face_detector.inference(frame)
+            
+            for face in faces:
+                x_min, y_min, x_max, y_max = face
+                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
+            
+            out.write(frame)
+        
+        video.release()
+        out.release()
+        print(f"Successfully redacted video and saved as {output_path}")
+
+        # Redact audio in the video
+        self.redact_audio_in_video(output_path)
+
+    def redact_audio_in_video(self, video_path):
+        # Extract audio from video
+        video = AudioSegment.from_file(video_path, format="mp4")
+        audio = video.split_to_mono()[0]
+        audio.export("temp_audio.wav", format="wav")
+
+        # Redact the extracted audio
+        self.path = "temp_audio.wav"
+        self.redact_audio()
+
+        # Combine redacted audio with redacted video
+        redacted_audio = AudioSegment.from_wav(os.path.splitext(self.path)[0] + '_redacted.wav')
+        video = video.overlay(redacted_audio)
+
+        output_path = os.path.splitext(video_path)[0] + '_with_redacted_audio.mp4'
+        video.export(output_path, format="mp4")
+
+        # Clean up temporary files
+        os.remove("temp_audio.wav")
+        os.remove(os.path.splitext(self.path)[0] + '_redacted.wav')
+        os.remove(video_path)
+
+        print(f"Successfully redacted video with audio and saved as {output_path}")
 
     def redact(self):
-        if self.path.endswith("pdf"):
+        file_extension = os.path.splitext(self.path)[1].lower()
+        if file_extension == ".pdf":
             self.redact_pdf()
-        elif self.path.endswith((".mp3", "wav")):
+        elif file_extension in [".mp3", ".wav"]:
             self.redact_audio()
+        elif file_extension in [".jpg", ".jpeg", ".png"]:
+            self.redact_image()
+        elif file_extension in [".mp4", ".avi", ".mov"]:
+            self.redact_video()
+        else:
+            print(f"Unsupported file type: {file_extension}")
 
 if __name__ == "__main__":
-    path = r'tests\audio\even_more_sensitive.mp3'
+    path = r'tests\image\peeyush_test_5.jpg'
     redactor = Redactor(path, plan_type="pro")
     sensitive_data = redactor.redact()
     print(redactor.sensitive_datas)
