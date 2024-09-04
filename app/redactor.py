@@ -13,7 +13,7 @@ from pydub import AudioSegment
 import cv2
 from openvino.runtime import Core
 import numpy as np
-import utils
+from app import utils
 
 load_dotenv()
 
@@ -241,6 +241,7 @@ class Redactor:
         doc.save(output_path)
         print(f"Successfully redacted and saved as {output_path}")
         # return self.sensitive_datas
+        return output_path
 
     def transcribe_audio_with_whisper(self):
         model = whisper.load_model("tiny")
@@ -309,6 +310,7 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.wav'
         redacted_audio.export(output_path, format="wav")
         print(f"Successfully redacted and saved as {output_path}")
+        return output_path
 
     def redact_image(self):
         image = cv2.imread(self.path)
@@ -321,6 +323,7 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.jpg'
         cv2.imwrite(output_path, image)
         print(f"Successfully redacted image and saved as {output_path}")
+        return output_path
 
     def redact_video(self):
         video = cv2.VideoCapture(self.path)
@@ -351,6 +354,7 @@ class Redactor:
 
         # Redact audio in the video
         self.redact_audio_in_video(output_path)
+        return output_path
 
     def redact_audio_in_video(self, video_path):
         # Extract audio from video
@@ -379,18 +383,18 @@ class Redactor:
     def redact(self):
         file_extension = os.path.splitext(self.path)[1].lower()
         if file_extension == ".pdf":
-            self.redact_pdf()
+            return self.redact_pdf()
         elif file_extension in [".mp3", ".wav"]:
-            self.redact_audio()
+            return self.redact_audio()
         elif file_extension in [".jpg", ".jpeg", ".png"]:
-            self.redact_image()
+            return self.redact_image()
         elif file_extension in [".mp4", ".avi", ".mov"]:
-            self.redact_video()
+            return self.redact_video()
         else:
             print(f"Unsupported file type: {file_extension}")
 
-if __name__ == "__main__":
-    path = r'tests\pdfs\Notice_Unauthorized_Freshers_Party.pdf'
-    redactor = Redactor(path, plan_type="pro")
-    sensitive_data = redactor.redact()
-    # print(redactor.sensitive_datas)
+# if __name__ == "__main__":
+#     path = r'tests\pdfs\Notice_Unauthorized_Freshers_Party.pdf'
+#     redactor = Redactor(path, plan_type="pro")
+#     sensitive_data = redactor.redact()
+#     # print(redactor.sensitive_datas)
