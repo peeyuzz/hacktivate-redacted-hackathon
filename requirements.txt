@@ -9,7 +9,8 @@ pytesseract
 opencv-python
 numpy
 fitz
-whisper
+openai-whisper
 pydub
 google-generativeai
 python-dotenv
+PyMuPDF
