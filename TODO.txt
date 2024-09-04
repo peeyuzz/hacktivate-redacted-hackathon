@@ -1,0 +1,4 @@
+- the output files should be visible to the user
+- if the user inputs a pdf file there should be a field to enter special remarks (before submitting the file) and the remarks should pass on the redact function
+- improve the ui ig? (not topmost priority)
+- 

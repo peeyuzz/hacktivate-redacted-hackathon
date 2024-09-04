@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+if os.path.exists("static"):
+    shutil.rmtree("static")
+
+os.makedirs(os.path.join("static", "redacted_files"))
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
