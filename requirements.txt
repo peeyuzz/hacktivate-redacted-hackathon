@@ -1,4 +1,15 @@
 fastapi
 uvicorn
+pydantic
 python-multipart
 jinja2
+httpx
+pillow
+pytesseract
+opencv-python
+numpy
+fitz
+whisper
+pydub
+google-generativeai
+python-dotenv

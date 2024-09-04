@@ -30,7 +30,6 @@ Path("static/redacted_files").mkdir(parents=True, exist_ok=True)
 @app.get("/")
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
-# ... (rest of the imports and setup remain the same)
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -65,7 +64,6 @@ async def upload_file(file: UploadFile = File(...)):
         logger.exception("An error occurred during file processing")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ... (rest of the code remains the same)
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):
