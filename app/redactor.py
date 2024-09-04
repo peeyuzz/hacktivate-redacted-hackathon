@@ -353,7 +353,7 @@ class Redactor:
         print(f"Successfully redacted video and saved as {output_path}")
 
         # Redact audio in the video
-        self.redact_audio_in_video(output_path)
+        # self.redact_audio_in_video(output_path)
         return output_path
 
     def redact_audio_in_video(self, video_path):
