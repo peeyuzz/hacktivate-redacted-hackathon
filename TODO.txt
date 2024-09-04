@@ -1,4 +1,0 @@
-- take image as input
-- perform OCR
-- identify names
-- get bounding boxes

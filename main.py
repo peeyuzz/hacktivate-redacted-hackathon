@@ -170,32 +170,57 @@ class Redactor:
         
         return sensitive_data
 
-    def get_text(self, page):
+    def get_text(self, page, get_blocks=False):
         text = page.get_text()
         if not text.strip():
             pix = page.get_pixmap()
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            text = self.perform_ocr(img)
-        return text
+            if get_blocks:
+                return self.perform_ocr(img, get_blocks=True)
+            else:
+                return self.perform_ocr(img)
+        else:
+            if get_blocks:
+                return page.get_text("blocks")
+            else:
+                return text
 
-    def perform_ocr(self, image):
+
+    def perform_ocr(self, image, get_blocks=False):
         """Perform OCR on the given image"""
-        return pytesseract.image_to_string(image)
+        if get_blocks:
+            ocr_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+            blocks = []
+            for i in range(len(ocr_data['text'])):
+                if ocr_data['text'][i].strip():
+                    x, y, w, h = ocr_data['left'][i], ocr_data['top'][i], ocr_data['width'][i], ocr_data['height'][i]
+                    blocks.append([x, y, x+w, y+h, ocr_data['text'][i]])
+            return blocks
+        else:
+            return pytesseract.image_to_string(image)
 
     def find_text_locations(self, page, sensitive_data):
         """Find the locations of sensitive data on the page."""
         locations = []
+        text_blocks = self.get_text(page, get_blocks=True)
+        
         for data in sensitive_data:
             text_instances = page.search_for(data['text'])
             if text_instances:
                 locations.extend(text_instances)
             else:
-                text_blocks = page.get_text("blocks")
-                for block in text_blocks:
-                    block_text = block[4]
-                    if data['text'] in block_text:
-                        block_rect = fitz.Rect(block[:4])
-                        locations.append(block_rect)
+                if isinstance(text_blocks, list):  # OCR result
+                    for block in text_blocks:
+                        # print(block)
+                        if block[4].lower().replace(" ", "  ") in data['text'].lower().split():
+                            block_rect = fitz.Rect(block[:4])
+                            locations.append(block_rect)
+                else:  # Regular PDF text blocks
+                    for block in text_blocks:
+                        block_text = block[4]
+                        if data['text'].lower() in block_text.lower():
+                            block_rect = fitz.Rect(block[:4])
+                            locations.append(block_rect)
         return locations
 
     def redact_pdf(self):
@@ -365,7 +390,7 @@ class Redactor:
             print(f"Unsupported file type: {file_extension}")
 
 if __name__ == "__main__":
-    path = r'tests\image\peeyush_test_5.jpg'
+    path = r'tests\pdfs\Notice_Unauthorized_Freshers_Party.pdf'
     redactor = Redactor(path, plan_type="pro")
     sensitive_data = redactor.redact()
-    print(redactor.sensitive_datas)
+    # print(redactor.sensitive_datas)
