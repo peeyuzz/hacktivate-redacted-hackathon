@@ -15,3 +15,8 @@ google-generativeai
 python-dotenv
 PyMuPDF
 openvino
+python-jose[cryptography]
+pymongo
+motor
+email-validator
+passlib
