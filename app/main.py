@@ -7,10 +7,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import datetime
 import shutil
 import os
 import logging
-
 
 # Import the auth routes
 from app.routers.auth_routes import router as auth_router
