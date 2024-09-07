@@ -213,7 +213,6 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
         return FileResponseModel(
             filename=compressed_filename,  # Send back the compressed file name
             type=file.content_type,
-            # Also include the original filename in the response
             original_filename=file.filename,
             cloudinary_url=cloudinary_response['secure_url'],  # Cloudinary URL
             created_at=datetime.utcnow()

@@ -18,8 +18,10 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-# Response model for file metadata
+# Updated Response model for file metadata
 class FileResponseModel(BaseModel):
     filename: str
     type: str
+    original_filename: str
+    cloudinary_url: str
     created_at: datetime
