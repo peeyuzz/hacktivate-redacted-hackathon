@@ -134,12 +134,12 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        logger.debug(f"File saved to {file_path}")
+        # logger.debug(f"File saved to {file_path}")
 
         # Perform redaction
         redactor = Redactor(file_path, plan_type="pro")
         redacted_path = redactor.redact()
-        logger.debug(f"Redacted path: {redacted_path}")
+        # logger.debug(f"Redacted path: {redacted_path}")
 
         if redacted_path is None or not os.path.exists(redacted_path):
             raise ValueError(
@@ -148,7 +148,7 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
         # Delete the original uploaded file after redaction
         if os.path.exists(file_path):
             os.remove(file_path)
-            logger.debug(f"Original file deleted: {file_path}")
+            # logger.debug(f"Original file deleted: {file_path}")
 
         # Generate a unique name for the redacted and compressed file
         compressed_filename = f"{unique_id}_compressed{file_extension}"
@@ -167,12 +167,12 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
             # If file type is unsupported, simply move the redacted file
             shutil.move(redacted_path, compressed_path)
 
-        logger.debug(f"Compressed file moved to {compressed_path}")
+        # logger.debug(f"Compressed file moved to {compressed_path}")
 
         # Delete the original redacted file after compression
         if os.path.exists(redacted_path):
             os.remove(redacted_path)
-            logger.debug(f"Redacted file deleted: {redacted_path}")
+            # logger.debug(f"Redacted file deleted: {redacted_path}")
 
         # Determine the resource type for Cloudinary upload
         resource_type = 'raw'
@@ -188,14 +188,14 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
             access_mode='public',
             public_id=f"{compressed_filename}" 
         )
-        logger.debug(f"Compressed file uploaded to Cloudinary: {
-                     cloudinary_response['secure_url']}")
+        # logger.debug(f"Compressed file uploaded to Cloudinary: {
+                    #  cloudinary_response['secure_url']}")
 
         # Delete the local compressed file after uploading
         if os.path.exists(compressed_path):
             os.remove(compressed_path)
-            logger.debug(f"Compressed file deleted from local storage: {
-                         compressed_path}")
+            # logger.debug(f"Compressed file deleted from local storage: {
+                        #  compressed_path}")
 
         # Store file metadata in MongoDB
         file_data = {
