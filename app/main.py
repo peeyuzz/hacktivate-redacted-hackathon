@@ -1,26 +1,36 @@
-# main.py
+import os
+import shutil
+import logging
+from uuid import uuid4
+from datetime import datetime
+from pathlib import Path
+
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
+
 from jose import JWTError, jwt
-from pathlib import Path
 from dotenv import load_dotenv
-from datetime import datetime
-import shutil
-import os
-import logging
-from app.redactor import Redactor
-from pathlib import Path
-from uuid import uuid4
-from fastapi.responses import FileResponse
-# Import the auth routes
-from app.routers.auth_routes import router as auth_router
+
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+from PIL import Image
+import fitz  # PyMuPDF
+from moviepy.editor import VideoFileClip
+from pydub import AudioSegment
+
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
+
+from app.redactor import Redactor
+from app.routers.auth_routes import router as auth_router
 from app.models.user_models import FileResponseModel
+
 load_dotenv()
 
 # Set up logging
@@ -35,6 +45,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
+)
+# Cloud variables
+CLOUD_NAME = os.environ['CLOUD_NAME']
+CLOUD_API_KEY = os.environ['CLOUD_API_KEY']
+CLOUD_API_SECRET = os.environ['CLOUD_API_SECRET']
+
+cloudinary.config(
+    cloud_name=CLOUD_NAME,
+    api_key=CLOUD_API_KEY,
+    api_secret=CLOUD_API_SECRET
 )
 
 # MongoDB connection setup
@@ -79,6 +99,28 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
+def compress_image(input_path: str, output_path: str):
+    with Image.open(input_path) as img:
+        img = img.convert("RGB")
+        img.save(output_path, "JPEG", optimize=True, quality=75)
+
+
+def compress_pdf(input_path: str, output_path: str):
+    doc = fitz.open(input_path)
+    doc.save(output_path, garbage=4, deflate=True)
+    doc.close()
+
+
+def compress_video(input_path: str, output_path: str):
+    clip = VideoFileClip(input_path)
+    clip.write_videofile(output_path, codec="libx264", bitrate="500k")
+
+
+def compress_audio(input_path: str, output_path: str):
+    audio = AudioSegment.from_file(input_path)
+    audio.export(output_path, format="mp3", bitrate="128k")
+
+
 @app.post("/upload", response_model=FileResponseModel)
 async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     try:
@@ -103,26 +145,77 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
             raise ValueError(
                 f"Redaction failed or file not found: {redacted_path}")
 
-        # Generate a unique name for the redacted file
-        redacted_filename = f"redacted_{unique_id}{file_extension}"
-        new_path = f"static/redacted_files/{redacted_filename}"
-        shutil.move(redacted_path, new_path)
-        logger.debug(f"Redacted file moved to {new_path}")
+        # Delete the original uploaded file after redaction
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.debug(f"Original file deleted: {file_path}")
+
+        # Generate a unique name for the redacted and compressed file
+        compressed_filename = f"{unique_id}_compressed{file_extension}"
+        compressed_path = f"static/redacted_files/{compressed_filename}"
+
+        # Compress the redacted file based on its type
+        if file_extension.lower() in ['.jpg', '.jpeg', '.png']:
+            compress_image(redacted_path, compressed_path)
+        elif file_extension.lower() == '.pdf':
+            compress_pdf(redacted_path, compressed_path)
+        elif file_extension.lower() in ['.mp4', '.mov', '.avi']:
+            compress_video(redacted_path, compressed_path)
+        elif file_extension.lower() in ['.mp3', '.wav', '.ogg']:
+            compress_audio(redacted_path, compressed_path)
+        else:
+            # If file type is unsupported, simply move the redacted file
+            shutil.move(redacted_path, compressed_path)
+
+        logger.debug(f"Compressed file moved to {compressed_path}")
+
+        # Delete the original redacted file after compression
+        if os.path.exists(redacted_path):
+            os.remove(redacted_path)
+            logger.debug(f"Redacted file deleted: {redacted_path}")
+
+        # Determine the resource type for Cloudinary upload
+        resource_type = 'raw'
+        if file_extension.lower() in ['.jpg', '.jpeg', '.png']:
+            resource_type = 'image'
+        elif file_extension.lower() in ['.mp4', '.mov', '.avi']:
+            resource_type = 'video'
+
+        # Upload the compressed file to Cloudinary
+        cloudinary_response = cloudinary.uploader.upload(
+            compressed_path,
+            resource_type=resource_type,
+            access_mode='public',
+            public_id=f"{compressed_filename}" 
+        )
+        logger.debug(f"Compressed file uploaded to Cloudinary: {
+                     cloudinary_response['secure_url']}")
+
+        # Delete the local compressed file after uploading
+        if os.path.exists(compressed_path):
+            os.remove(compressed_path)
+            logger.debug(f"Compressed file deleted from local storage: {
+                         compressed_path}")
 
         # Store file metadata in MongoDB
         file_data = {
             "user_id": str(current_user["_id"]),
-            "original_filename": file.filename,
-            "stored_filename": redacted_filename,
+            "original_filename": file.filename,  # The original file name uploaded
+            "stored_filename": compressed_filename,  # The file name after compression
             "file_type": file.content_type,
+            # URL of the uploaded file on Cloudinary
+            "cloudinary_url": cloudinary_response['secure_url'],
             "created_at": datetime.utcnow()
         }
         await files_collection.insert_one(file_data)
 
         # Return the file metadata for downloading
         return FileResponseModel(
-            filename=redacted_filename,
+            filename=compressed_filename,  # Send back the compressed file name
             type=file.content_type,
+            # Also include the original filename in the response
+            original_filename=file.filename,
+            cloudinary_url=cloudinary_response['secure_url'],  # Cloudinary URL
             created_at=datetime.utcnow()
         )
 
@@ -133,17 +226,27 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):
-    file_path = f"static/redacted_files/{filename}"
-    if os.path.exists(file_path):
-        return FileResponse(file_path, filename=filename)
-    raise HTTPException(status_code=404, detail="File not found")
-
+    try:
+        # Generate the URL for the file from Cloudinary
+        file_url = cloudinary.CloudinaryImage(filename).build_url()
+        
+        # Use RedirectResponse to redirect to the Cloudinary URL
+        return RedirectResponse(url=file_url)
+    except Exception as e:
+        raise HTTPException(
+            status_code=404, detail="File not found on Cloudinary")
 
 @app.get("/user/files")
 async def get_user_files(current_user: dict = Depends(get_current_user)):
     user_files = await files_collection.find({"user_id": str(current_user["_id"])}).to_list(100)
-    return [{"filename": file["stored_filename"], "type": file["file_type"], "created_at": file["created_at"]} for file in user_files]
-
+    return [{
+        "original_filename": file["original_filename"],
+        "stored_filename": file["stored_filename"],
+        "type": file["file_type"],
+        "cloudinary_url": file["cloudinary_url"],
+        "created_at": file["created_at"],
+    } for file in user_files]
+       
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
