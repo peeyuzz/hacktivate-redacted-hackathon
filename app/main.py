@@ -11,7 +11,9 @@ from datetime import datetime
 import shutil
 import os
 import logging
-
+from starlette.requests import Request
+from app.redactor import Redactor
+from pathlib import Path
 # Import the auth routes
 from app.routers.auth_routes import router as auth_router
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -51,6 +53,8 @@ Path("static/redacted_files").mkdir(parents=True, exist_ok=True)
 app.include_router(auth_router)
 
 # Middleware to get current user
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -64,38 +68,53 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+
+from uuid import uuid4
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     try:
-        file_path = f"static/uploaded_{file.filename}"
+        # Generate a unique identifier to prevent duplicate file names
+        unique_id = uuid4().hex
+        file_extension = os.path.splitext(file.filename)[1]  # Get the file extension
+        unique_filename = f"uploaded_{unique_id}{file_extension}"
+        file_path = f"static/{unique_filename}"
+
+        # Save the uploaded file to a temporary path
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         logger.debug(f"File saved to {file_path}")
         
-        # Perform processing on file
-        redacted_path = f"static/redacted_files/redacted_{file.filename}"
-        shutil.copyfile(file_path, redacted_path)
+        # Perform redaction
+        redactor = Redactor(file_path, plan_type="pro")
+        redacted_path = redactor.redact()
+        logger.debug(f"Redacted path: {redacted_path}")
+
+        if redacted_path is None or not os.path.exists(redacted_path):
+            raise ValueError(f"Redaction failed or file not found: {redacted_path}")
         
-        if not os.path.exists(redacted_path):
-            raise ValueError(f"Processing failed or file not found: {redacted_path}")
-        
-        logger.debug(f"File processed, new path: {redacted_path}")
-        
+        # Generate a unique name for the redacted file as well
+        redacted_filename = f"redacted_{unique_id}{file_extension}"
+        new_path = f"static/redacted_files/{redacted_filename}"
+        shutil.move(redacted_path, new_path)
+        logger.debug(f"Redacted file moved to {new_path}")
+
         # Store file metadata in MongoDB
         file_data = {
             "user_id": str(current_user["_id"]),
             "original_filename": file.filename,
-            "stored_filename": f"redacted_{file.filename}",
+            "stored_filename": redacted_filename,
             "file_type": file.content_type,
             "created_at": datetime.utcnow()
         }
         await files_collection.insert_one(file_data)
-        
+
         # Clean up original uploaded file
         os.remove(file_path)
-        
-        return {"filename": file_data["stored_filename"]}
+
+        return {"filename": redacted_filename}
+
     except Exception as e:
         logger.exception("An error occurred during file processing")
         raise HTTPException(status_code=500, detail=str(e))
@@ -107,6 +126,7 @@ async def download_file(filename: str):
     if os.path.exists(file_path):
         return FileResponse(file_path, filename=filename)
     raise HTTPException(status_code=404, detail="File not found")
+
 
 @app.get("/user/files")
 async def get_user_files(current_user: dict = Depends(get_current_user)):
