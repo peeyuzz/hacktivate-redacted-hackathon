@@ -11,7 +11,6 @@ from datetime import datetime
 import shutil
 import os
 import logging
-from starlette.requests import Request
 from app.redactor import Redactor
 from pathlib import Path
 from uuid import uuid4
@@ -20,7 +19,7 @@ from fastapi.responses import FileResponse
 from app.routers.auth_routes import router as auth_router
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
-
+from app.models.user_models import FileResponseModel
 load_dotenv()
 
 # Set up logging
