@@ -13,7 +13,8 @@ from app.models.user_models import User, Token
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # MongoDB connection setup
-client = AsyncIOMotorClient("mongodb://localhost:27017")
+MONGODB_URL = os.environ["MONGODB_URL"]
+client = AsyncIOMotorClient(MONGODB_URL)
 db = client["file_management"]
 users_collection = db["users"]
 
