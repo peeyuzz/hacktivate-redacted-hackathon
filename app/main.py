@@ -14,6 +14,8 @@ import logging
 from starlette.requests import Request
 from app.redactor import Redactor
 from pathlib import Path
+from uuid import uuid4
+from fastapi.responses import FileResponse
 # Import the auth routes
 from app.routers.auth_routes import router as auth_router
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -69,14 +71,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-from uuid import uuid4
-
-@app.post("/upload")
+@app.post("/upload", response_model=FileResponseModel)
 async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     try:
-        # Generate a unique identifier to prevent duplicate file names
+        # Generate a unique identifier for the uploaded file
         unique_id = uuid4().hex
-        file_extension = os.path.splitext(file.filename)[1]  # Get the file extension
+        file_extension = os.path.splitext(file.filename)[1]
         unique_filename = f"uploaded_{unique_id}{file_extension}"
         file_path = f"static/{unique_filename}"
 
@@ -85,16 +85,17 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
             shutil.copyfileobj(file.file, buffer)
 
         logger.debug(f"File saved to {file_path}")
-        
+
         # Perform redaction
         redactor = Redactor(file_path, plan_type="pro")
         redacted_path = redactor.redact()
         logger.debug(f"Redacted path: {redacted_path}")
 
         if redacted_path is None or not os.path.exists(redacted_path):
-            raise ValueError(f"Redaction failed or file not found: {redacted_path}")
-        
-        # Generate a unique name for the redacted file as well
+            raise ValueError(
+                f"Redaction failed or file not found: {redacted_path}")
+
+        # Generate a unique name for the redacted file
         redacted_filename = f"redacted_{unique_id}{file_extension}"
         new_path = f"static/redacted_files/{redacted_filename}"
         shutil.move(redacted_path, new_path)
@@ -110,10 +111,12 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
         }
         await files_collection.insert_one(file_data)
 
-        # Clean up original uploaded file
-        os.remove(file_path)
-
-        return {"filename": redacted_filename}
+        # Return the file metadata for downloading
+        return FileResponseModel(
+            filename=redacted_filename,
+            type=file.content_type,
+            created_at=datetime.utcnow()
+        )
 
     except Exception as e:
         logger.exception("An error occurred during file processing")
