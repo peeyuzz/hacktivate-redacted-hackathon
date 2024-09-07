@@ -1,5 +1,6 @@
-# auth_routes.py
-from fastapi import APIRouter, HTTPException, Depends
+from motor.motor_asyncio import AsyncIOMotorClient
+from app.models.user_models import User, Token
+from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -8,9 +9,6 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-# Import models from user_models.py
-from app.models.user_models import User, Token
-from motor.motor_asyncio import AsyncIOMotorClient
 
 # MongoDB connection setup
 MONGODB_URL = os.environ["MONGODB_URL"]
@@ -48,6 +46,17 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 # Signup route
 @router.post("/signup", response_model=Token)
 async def signup(user: User):
+    # Check if the user already exists
+    existing_user = await users_collection.find_one({"$or": [{"username": user.username}, {"email": user.email}]})
+    if existing_user:
+        if existing_user.get("username") == user.username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
+        if existing_user.get("email") == user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    # Hash the password and create user data
     hashed_password = hash_password(user.password)
     user_data = {
         "username": user.username,
@@ -55,8 +64,13 @@ async def signup(user: User):
         "password": hashed_password,
         "created_at": datetime.utcnow()
     }
+
+    # Insert new user into the database
     await users_collection.insert_one(user_data)
+
+    # Create access token
     access_token = create_access_token(data={"sub": user.username})
+
     return {"access_token": access_token, "token_type": "bearer"}
 
 # Login route
@@ -64,6 +78,7 @@ async def signup(user: User):
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await users_collection.find_one({"username": form_data.username})
     if not user or not verify_password(form_data.password, user["password"]):
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+        raise HTTPException(
+            status_code=400, detail="Incorrect username or password")
     access_token = create_access_token(data={"sub": user["username"]})
     return {"access_token": access_token, "token_type": "bearer"}

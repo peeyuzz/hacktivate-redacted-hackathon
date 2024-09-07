@@ -21,3 +21,4 @@ motor
 email-validator
 passlib
 uuid
+bcrypt==4.0.1
