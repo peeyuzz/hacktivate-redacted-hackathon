@@ -8,7 +8,6 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -76,7 +75,6 @@ if os.path.exists("static"):
 os.makedirs(os.path.join("static", "redacted_files"))
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-templates = Jinja2Templates(directory="templates")
 Path("static/redacted_files").mkdir(parents=True, exist_ok=True)
 
 # Include the authentication router

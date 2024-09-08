@@ -2,11 +2,10 @@ fastapi
 uvicorn
 pydantic
 python-multipart
-jinja2
 httpx
 pillow
 pytesseract
-opencv-python
+opencv-python-headless
 numpy
 openai-whisper
 pydub
