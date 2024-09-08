@@ -5,7 +5,7 @@ from PIL import Image
 import os
 import json
 import google.generativeai as genai
-from google.generativeai import GenerativeModel
+# from google.generativeai import GenerativeModel
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from dotenv import load_dotenv
 import whisper
