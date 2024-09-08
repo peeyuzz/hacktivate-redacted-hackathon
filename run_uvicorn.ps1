@@ -1,1 +1,1 @@
-﻿uvicorn app.main:app --reload --log-level debug
+﻿python3 app/main.py
