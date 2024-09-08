@@ -7,6 +7,10 @@ pillow
 pytesseract
 opencv-python-headless
 numpy
+-f https://download.pytorch.org/whl/cpu
+torch
+torchvision
+torchaudio
 openai-whisper
 pydub
 google-generativeai
@@ -22,7 +26,3 @@ uuid
 bcrypt==4.0.1
 cloudinary
 moviepy
--f https://download.pytorch.org/whl/cpu
-torch
-torchvision
-torchaudio
