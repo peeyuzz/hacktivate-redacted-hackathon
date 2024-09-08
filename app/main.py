@@ -26,7 +26,7 @@ from pydub import AudioSegment
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 
-from app.redactor import Redactor
+# from app.redactor import Redactor
 from app.routers.auth_routes import router as auth_router
 from app.models.user_models import FileResponseModel
 
