@@ -13,7 +13,7 @@ from pydub import AudioSegment
 import cv2
 from openvino.runtime import Core
 import numpy as np
-from app import utils
+import utils
 import platform
 
 load_dotenv()
