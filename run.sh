@@ -1,1 +1,1 @@
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --log-level debug
+sudo python3 app/main.py
