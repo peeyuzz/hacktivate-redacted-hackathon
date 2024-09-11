@@ -312,13 +312,13 @@ class Redactor:
             
             locations = []
 
-            text = self.get_text_with_ocr(Image.fromarray(frame))
-            if text.strip():
-                print(text)
-                sensitive_data = self.get_sensitive_data(text)
-                text_locations = self.find_text_locations_with_ocr(Image.fromarray(frame), sensitive_data)
-                if text_locations:
-                    locations.extend(text_locations)
+            # text = self.get_text_with_ocr(Image.fromarray(frame))
+            # if text.strip():
+            #     print(text)
+            #     sensitive_data = self.get_sensitive_data(text)
+            #     text_locations = self.find_text_locations_with_ocr(Image.fromarray(frame), sensitive_data)
+            #     if text_locations:
+            #         locations.extend(text_locations)
 
             face_locations = self.get_face_location(np.array(frame), use_fitz_format=False)
             if face_locations is not None:
@@ -333,9 +333,67 @@ class Redactor:
         video.release()
         out.release()
         print(f"Successfully redacted video and saved as {output_path}")
+    
+    def transcribe_audio_with_whisper(self):
+        model = whisper.load_model("tiny")
+        transcript = model.transcribe(
+            word_timestamps=True,
+            audio=self.path
+        )
+        return transcript
+    
+    def find_audio_locations(self, transcript, sensitive_data):
+        locations = []
+        for data in sensitive_data:
+            for segment in transcript['segments']:
+                if data['text'] in segment['text']:
+                    print(data['text'])
+                    print(segment['text'])
+                    start_time = segment['start']
+                    end_time = segment['end']
+                    for word in segment['words']:
+                        if word['word'].replace(" ", "")[:-2] not in data['text']:
+                            print(f"{word['word']} not in data")
+                            start_time = word['end']
+                        else:
+                            print(f"{word['word']} in data")
+                            break
+                    for word in reversed(segment['words']):
+                        if word['word'].replace(" ", "")[:-2] not in data['text']:
+                            print(f"{word['word']} not in data")
+                            end_time = word['start']
+                        else:
+                            print(f"{word['word']} in data")
+                            break
+                    locations.append((start_time, end_time))
+        return locations
+    
+    def redact_audio(self):
+        audio = AudioSegment.from_file(self.path)
+        audio_length = len(audio)
+        transcript = self.transcribe_audio_with_whisper()
+        text = ' '.join([segment['text'] for segment in transcript['segments']])
+        sensitive_data = self.get_sensitive_data(text)
+        locations = self.find_audio_locations(transcript, sensitive_data)
+        beep = AudioSegment.from_wav("beep.wav")
+        locations.sort(key=lambda x: x[0])
 
+        redacted_audio = AudioSegment.empty()
+        last_end = 0
 
+        for start_time, end_time in locations:
+            start_ms = int(start_time * 1000)
+            end_ms = int(end_time * 1000)
+            redacted_audio += audio[last_end:start_ms]
+            redacted_audio += beep[:end_ms - start_ms]
+            last_end = end_ms
+        redacted_audio += audio[last_end:]
         
+        output_path = os.path.splitext(self.path)[0] + '_redacted.wav'
+        redacted_audio.export(output_path, format="wav")
+        print(f"Successfully redacted and saved as {output_path}")
+
+
 path = r"tests\videos\Shocking footage_ Deadly Chinese bus crash caught on camera.mp4"
 redactor = Redactor(path, plan_type="free")
 redactor.redact_video()
