@@ -275,29 +275,67 @@ class Redactor:
 
     def redact_image(self):
         image = cv2.imread(self.path)
-        text = self.get_text_with_ocr(Image.fromarray(image))
-        sensitive_data = self.get_sensitive_data(text)
         locations = []
-    
-        text_locations = self.find_text_locations_with_ocr(Image.fromarray(image), sensitive_data)
-        if text_locations:
-            locations.extend(text_locations)
+        text = self.get_text_with_ocr(Image.fromarray(image))
+        if text.strip():
+            sensitive_data = self.get_sensitive_data(text)
+            text_locations = self.find_text_locations_with_ocr(Image.fromarray(image), sensitive_data)
+            if text_locations:
+                locations.extend(text_locations)
         face_locations = self.get_face_location(np.array(image), use_fitz_format=False)
         if face_locations is not None:
             locations.extend(face_locations) 
     
         for location in locations:
             x_min, y_min, x_max, y_max = np.array(location, dtype=np.int32)
-            print(type(x_min), x_min)
-
             cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
 
         output_path = os.path.splitext(self.path)[0] + '_redacted.jpg'
         cv2.imwrite(output_path, image)
         print(f"Successfully redacted image and saved as {output_path}")
+
+
+    def redact_video(self):
+        video = cv2.VideoCapture(self.path)
+        fps = video.get(cv2.CAP_PROP_FPS)
+        width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        output_path = os.path.splitext(self.path)[0] + '_redacted.mp4'
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+        while True:
+            ret, frame = video.read()
+            if not ret:
+                break
             
+            locations = []
+
+            text = self.get_text_with_ocr(Image.fromarray(frame))
+            if text.strip():
+                print(text)
+                sensitive_data = self.get_sensitive_data(text)
+                text_locations = self.find_text_locations_with_ocr(Image.fromarray(frame), sensitive_data)
+                if text_locations:
+                    locations.extend(text_locations)
+
+            face_locations = self.get_face_location(np.array(frame), use_fitz_format=False)
+            if face_locations is not None:
+                locations.extend(face_locations) 
+        
+            for location in locations:
+                x_min, y_min, x_max, y_max = np.array(location, dtype=np.int32)
+                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
+                
+            out.write(frame)
+
+        video.release()
+        out.release()
+        print(f"Successfully redacted video and saved as {output_path}")
+
 
         
-path = r"tests\images\sideways_not_clear.jpg"
-redactor = Redactor(path, plan_type="pro")
-redactor.redact_image()
+path = r"tests\videos\Shocking footage_ Deadly Chinese bus crash caught on camera.mp4"
+redactor = Redactor(path, plan_type="free")
+redactor.redact_video()
