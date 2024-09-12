@@ -122,10 +122,11 @@ class Redactor:
     PASSPORT_PATTERN = r'\b[A-PR-WY][1-9]\d{7}\b'
     PAN_PATTERN = r'\b[A-Z]{5}[0-9]{4}[A-Z]\b'
     BANK_ACC_PATTERN = r'\b\d{9,18}\b'
-    def __init__(self, path, plan_type="free"):
+    def __init__(self, path, plan_type="free", special_instructions=None):
         model_path = os.path.join("model", "public", "ultra-lightweight-face-detection-rfb-320", "FP16", "ultra-lightweight-face-detection-rfb-320.xml")
         self.path = path
         self.texts = ""
+        self.special_instructions=special_instructions
         self.plan_type = plan_type
         self.sensitive_datas = []
         self.face_detector = FaceDetector(model=model_path)
@@ -166,6 +167,9 @@ class Redactor:
         if self.plan_type == 'pro':
             with open('prompt.txt', 'r', encoding='utf-8') as file:
                 prompt = file.read()
+            if self.special_instructions:
+                prompt += f"""\n SPECIAL INSTRUCTIONS FROM THE USER, THESE HAVE THE HIGHEST PRIORITY: {self.special_instructions}"""
+                # print(prompt)
             model = genai.GenerativeModel("gemini-1.5-flash")
             response = model.generate_content(
                 f"<DOCUMENT>\n{text}\n</DOCUMENT>\n\n{prompt}",
@@ -394,6 +398,6 @@ class Redactor:
         print(f"Successfully redacted and saved as {output_path}")
 
 
-path = r"tests\videos\Shocking footage_ Deadly Chinese bus crash caught on camera.mp4"
-redactor = Redactor(path, plan_type="free")
-redactor.redact_video()
+path = r"tests\pdfs\even_more_sensitive.pdf"
+redactor = Redactor(path, plan_type="pro")
+redactor.redact_pdf()

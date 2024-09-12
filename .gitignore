@@ -160,3 +160,36 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+tests/images/Elon_Musk.jpg
+tests/images/output_image.jpg
+tests/images/peeyush_test_2.jpg
+tests/images/peeyush_test_3.jpg
+tests/images/peeyush_test_4_redacted.jpg
+tests/images/peeyush_test_4.jpg
+tests/images/peeyush_test_5_redacted.jpg
+tests/images/peeyush_test_5.jpg
+tests/images/peeyush_test_6_redacted.jpg
+tests/images/peeyush_test_6.jpg
+tests/images/peeyush_Test.jpg
+tests/images/sideways_not_clear_redacted.jpg
+tests/images/sideways_not_clear.jpg
+kernel.errors.txt
+tests/audio/even_more_sensitive_redacted.wav
+tests/audio/even_more_sensitive.mp3
+tests/audios/even_more_sensitive_redacted.wav
+tests/audios/even_more_sensitive.mp3
+tests/image/sideways_not_clear_redacted.jpg
+tests/image/sideways_not_clear.jpg
+tests/images/aadahr_redacted.jpg
+tests/images/aadahr.png
+tests/images/peeyush_test_3_redacted.jpg
+tests/images/peeyush_test_5_redacted copy.jpg
+tests/pdfs/aadhar_redacted.pdf
+tests/pdfs/aadhar.pdf
+tests/pdfs/all_info_redacted.pdf
+tests/pdfs/all_info.pdf
+tests/pdfs/even_more_sensitive_redacted.pdf
+tests/pdfs/peeyush_resume_redacted.pdf
+tests/videos/Shocking footage_ Deadly Chinese bus crash caught on camera_redacted.mp4
+tests/videos/Shocking footage_ Deadly Chinese bus crash caught on camera.mp4
+kernel.errors.txt
