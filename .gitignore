@@ -193,3 +193,23 @@ tests/pdfs/peeyush_resume_redacted.pdf
 tests/videos/Shocking footage_ Deadly Chinese bus crash caught on camera_redacted.mp4
 tests/videos/Shocking footage_ Deadly Chinese bus crash caught on camera.mp4
 kernel.errors.txt
+tests/audio/even_more_sensitive_redacted.wav
+tests/audio/even_more_sensitive.mp3
+tests/image/sideways_not_clear_redacted.jpg
+tests/image/sideways_not_clear.jpg
+tests/images/aadhar_image_redacted.jpg
+tests/images/aadhar_image.jpeg
+tests/images/qrcode_redacted.jpg
+tests/images/qrcode.png
+tests/images/testQRCode-1.webp
+tests/pdfs/Central Civil Services (Pension) Amendment Rules, 2024_redacted.pdf
+tests/pdfs/Central Civil Services (Pension) Amendment Rules, 2024.pdf
+tests/pdfs/even_more_sensitive_redacted.pdf
+tests/pdfs/Notice_Unauthorized_Freshers_Party_redacted.pdf
+tests/pdfs/Office order Regarding Penalty Imposed by the Proctorial Board_redacted.pdf
+tests/pdfs/Office order Regarding Penalty Imposed by the Proctorial Board.pdf
+tests/pdfs/output_deskewed.pdf
+tests/pdfs/output_skewed.pdf
+tests/pdfs/peeyush_resume_redacted.pdf
+tests/pdfs/Transfer  Posting of officers in JAG of ITS Group ‘A’ - reg_redacted.pdf
+tests/pdfs/Transfer  Posting of officers in JAG of ITS Group ‘A’ - reg.pdf

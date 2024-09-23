@@ -26,3 +26,5 @@ uuid
 bcrypt==4.0.1
 cloudinary
 moviepy
+pyzbar
+deskew
