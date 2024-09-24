@@ -15,6 +15,10 @@ from scipy.ndimage import rotate
 from deskew import determine_skew
 import whisper
 from pydub import AudioSegment
+import docx
+from docx.shared import RGBColor
+import openpyxl
+import pandas as pd
 
 load_dotenv()
 
@@ -39,13 +43,14 @@ class Redactor:
     DRIVING_LICENSE_PATTERN = r'\b[A-Z]{2}\d{13}\b'
     VEHICLE_REGISTRATION_PATTERN = r'\b[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{1,4}\b'
 
-    def __init__(self, path, plan_type="free", special_instructions=None):
+    def __init__(self, path, plan_type="free", special_instructions=None, level = ["low", "medium","high"]):
         self.path = path
         self.special_instructions = special_instructions
         self.plan_type = plan_type
         model_path = os.path.join("model", "public", "ultra-lightweight-face-detection-rfb-320", "FP16", "ultra-lightweight-face-detection-rfb-320.xml")
         self.face_detector = FaceDetector(model=model_path)
         self.zoom_factor = 2  # Consolidated zoom factor
+        self.level = level
 
     def preprocess_image(self, image):
         # Convert to grayscale if needed
@@ -128,18 +133,20 @@ class Redactor:
         full_text = " ".join([block[4].lower() for block in text_blocks])
         
         for data in sensitive_data:
-            data_text = data['text'].lower()
-            start = full_text.find(data_text)
-            if start != -1:
-                end = start + len(data_text)
-                word_start = full_text[:start].count(' ')
-                word_end = word_start + data_text.count(' ') + 1
-                
-                for block in text_blocks[word_start:word_end]:
-                    x0, y0, x1, y1 = block[:4]
-                #    locations.append(fitz.Rect(x0, y0, x1, y1))
-                    locations.append(fitz.Rect(x0, y0, x1, y1))
-        
+            if data['level'] in self.level:
+                data_text = data['text'].lower()
+                start = full_text.find(data_text)
+                if start != -1:
+                    end = start + len(data_text)
+                    word_start = full_text[:start].count(' ')
+                    word_end = word_start + data_text.count(' ') + 1
+                    
+                    for block in text_blocks[word_start:word_end]:
+                        x0, y0, x1, y1 = block[:4]
+                    #    locations.append(fitz.Rect(x0, y0, x1, y1))
+                        locations.append(fitz.Rect(x0, y0, x1, y1))
+            else:
+                continue
         return locations
 
     def get_face_and_qr_locations(self, image):
@@ -182,6 +189,52 @@ class Redactor:
         doc.save(output_path)
         print(f"Successfully redacted and saved as {output_path}")
         return locations
+    
+    def redact_txt(self):
+        with open(self.path, 'r', encoding='utf-8') as file:
+            content = file.read()
+        
+        sensitive_data = self.get_sensitive_data(content)
+        redacted_content = content
+
+        for data in sensitive_data:
+            if data['level'] in self.level:
+                redacted_content = redacted_content.replace(data['text'], '[REDACTED]')
+
+        output_path = os.path.splitext(self.path)[0] + '_redacted.txt'
+        with open(output_path, 'w', encoding='utf-8') as file:
+            file.write(redacted_content)
+        
+        print(f"Successfully redacted and saved as {output_path}")
+
+    def redact_docx(self):
+        doc = docx.Document(self.path)
+        content = "\n".join([para.text for para in doc.paragraphs])
+        
+        sensitive_data = self.get_sensitive_data(content)
+        print(sensitive_data)
+        for para in doc.paragraphs:
+            for data in sensitive_data:
+                if data['level'] in self.level and data['text'] in para.text:
+                    para.text = para.text.replace(data['text'], '[REDACTED]')
+
+        output_path = os.path.splitext(self.path)[0] + '_redacted.docx'
+        doc.save(output_path)
+        print(f"Successfully redacted and saved as {output_path}")
+
+    def redact_xlsx(self):
+        df = pd.read_excel(self.path)
+        content = df.to_string()
+        
+        sensitive_data = self.get_sensitive_data(content)
+
+        for data in sensitive_data:
+            if data['level'] in self.level:
+                df = df.replace(data['text'], '[REDACTED]', regex=True)
+
+        output_path = os.path.splitext(self.path)[0] + '_redacted.xlsx'
+        df.to_excel(output_path, index=False)
+        print(f"Successfully redacted and saved as {output_path}")
 
     def redact_image(self):
         image = cv2.imread(self.path)
@@ -305,7 +358,10 @@ class Redactor:
             ".png": self.redact_image,
             ".mp4": self.redact_video,
             ".avi": self.redact_video,
-            ".mov": self.redact_video
+            ".mov": self.redact_video,
+            ".txt": self.redact_txt,
+            ".docx": self.redact_docx,
+            ".xlsx": self.redact_xlsx
         }
         
         redact_method = redaction_methods.get(file_extension)
@@ -315,6 +371,6 @@ class Redactor:
             print(f"Unsupported file type: {file_extension}")
             return None
 
-path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1).pdf"
-redactor = Redactor(path, plan_type="pro")
+path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1).docx"
+redactor = Redactor(path, plan_type="pro", level=["low"])
 redactor.redact()
