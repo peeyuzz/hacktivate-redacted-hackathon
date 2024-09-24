@@ -213,3 +213,11 @@ tests/pdfs/output_skewed.pdf
 tests/pdfs/peeyush_resume_redacted.pdf
 tests/pdfs/Transfer  Posting of officers in JAG of ITS Group ‘A’ - reg_redacted.pdf
 tests/pdfs/Transfer  Posting of officers in JAG of ITS Group ‘A’ - reg.pdf
+app/wr_cpde.py
+tests/audio/even_more_sensitive_redacted.wav
+tests/audio/even_more_sensitive.mp3
+tests/image/sideways_not_clear_redacted.jpg
+tests/image/sideways_not_clear.jpg
+tests/pdfs/even_more_sensitive_redacted.pdf
+tests/pdfs/Notice_Unauthorized_Freshers_Party_redacted.pdf
+tests/pdfs/peeyush_resume_redacted.pdf
