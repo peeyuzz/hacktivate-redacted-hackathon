@@ -5,7 +5,7 @@ from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
@@ -29,6 +29,9 @@ from bson import ObjectId
 from redactor import Redactor
 from routers.auth_routes import router as auth_router
 from models.user_models import FileResponseModel
+from typing import List, Optional
+from pydantic import BaseModel, conlist
+
 
 load_dotenv()
 
@@ -96,6 +99,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# Compression
 
 def compress_image(input_path: str, output_path: str):
     with Image.open(input_path) as img:
@@ -119,8 +123,14 @@ def compress_audio(input_path: str, output_path: str):
     audio.export(output_path, format="mp3", bitrate="128k")
 
 
+
 @app.post("/upload", response_model=FileResponseModel)
-async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+async def upload_file(
+    file: UploadFile = File(...), 
+    special_instructions: Optional[str] = Form(None), 
+    level_of_redaction: Optional[List[str]] = Form(None),
+    current_user: dict = Depends(get_current_user)
+):
     try:
         # Generate a unique identifier for the uploaded file
         unique_id = uuid4().hex
@@ -248,9 +258,9 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(    
                 app, 
-                host="0.0.0.0", 
+                # host="0.0.0.0", 
                 port=8000,
-                ssl_keyfile="app/cert/private.key",
-                ssl_certfile="app/cert/certificate.crt",
-                ssl_ca_certs="app/cert/ca_bundle.crt"
+                # ssl_keyfile="app/cert/private.key",
+                # ssl_certfile="app/cert/certificate.crt",
+                # ssl_ca_certs="app/cert/ca_bundle.crt"
                 )
