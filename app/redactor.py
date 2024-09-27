@@ -371,6 +371,6 @@ class Redactor:
             print(f"Unsupported file type: {file_extension}")
             return None
 
-path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1).docx"
-redactor = Redactor(path, plan_type="pro", level=["low"])
-redactor.redact()
+# path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1).docx"
+# redactor = Redactor(path, plan_type="pro", level=["low"])
+# redactor.redact()
