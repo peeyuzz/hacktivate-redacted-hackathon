@@ -188,7 +188,7 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.pdf'
         doc.save(output_path)
         print(f"Successfully redacted and saved as {output_path}")
-        return locations
+        return {"locations": locations, "output_path": output_path}
     
     def redact_txt(self):
         with open(self.path, 'r', encoding='utf-8') as file:
@@ -206,6 +206,7 @@ class Redactor:
             file.write(redacted_content)
         
         print(f"Successfully redacted and saved as {output_path}")
+        return {"output_path":output_path}
 
     def redact_docx(self):
         doc = docx.Document(self.path)
@@ -221,6 +222,7 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.docx'
         doc.save(output_path)
         print(f"Successfully redacted and saved as {output_path}")
+        return {"output_path":output_path}
 
     def redact_xlsx(self):
         df = pd.read_excel(self.path)
@@ -235,6 +237,7 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.xlsx'
         df.to_excel(output_path, index=False)
         print(f"Successfully redacted and saved as {output_path}")
+        return {"output_path":output_path}
 
     def redact_image(self):
         image = cv2.imread(self.path)
@@ -254,7 +257,7 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.jpg'
         cv2.imwrite(output_path, image)
         print(f"Successfully redacted image and saved as {output_path}")
-        return locations
+        return {"locations": locations, "output_path": output_path}
     
     def redact_video(self):
         video = cv2.VideoCapture(self.path)
@@ -296,6 +299,7 @@ class Redactor:
         video.release()
         out.release()
         print(f"Successfully redacted video and saved as {output_path}")
+        return {"output_path":output_path}
 
     def transcribe_audio_with_whisper(self):
         model = whisper.load_model("tiny")
@@ -346,6 +350,7 @@ class Redactor:
         output_path = os.path.splitext(self.path)[0] + '_redacted.wav'
         redacted_audio.export(output_path, format="wav")
         print(f"Successfully redacted audio and saved as {output_path}")
+        return {"locations": locations, "output_path": output_path}
 
     def redact(self):
         file_extension = os.path.splitext(self.path)[1].lower()

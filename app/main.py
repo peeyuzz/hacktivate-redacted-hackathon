@@ -146,7 +146,7 @@ async def upload_file(
 
         # Perform redaction
         redactor = Redactor(file_path, plan_type="pro")
-        redacted_path = redactor.redact()
+        redacted_path = redactor.redact()["output_path"]
         # logger.debug(f"Redacted path: {redacted_path}")
 
         if redacted_path is None or not os.path.exists(redacted_path):
