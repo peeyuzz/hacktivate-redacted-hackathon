@@ -145,7 +145,7 @@ async def upload_file(
         # logger.debug(f"File saved to {file_path}")
 
         # Perform redaction
-        redactor = Redactor(file_path, plan_type="pro")
+        redactor = Redactor(file_path, plan_type="pro", special_instructions=special_instructions, level= level_of_redaction)
         redacted_path = redactor.redact()["output_path"]
         # logger.debug(f"Redacted path: {redacted_path}")
 
@@ -258,9 +258,9 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(    
                 app, 
-                # host="0.0.0.0", 
+                host="0.0.0.0", 
                 port=8000,
-                # ssl_keyfile="app/cert/private.key",
-                # ssl_certfile="app/cert/certificate.crt",
-                # ssl_ca_certs="app/cert/ca_bundle.crt"
+                ssl_keyfile="app/cert/private.key",
+                ssl_certfile="app/cert/certificate.crt",
+                ssl_ca_certs="app/cert/ca_bundle.crt"
                 )
