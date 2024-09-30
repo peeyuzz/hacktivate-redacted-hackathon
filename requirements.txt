@@ -28,3 +28,5 @@ cloudinary
 moviepy
 pyzbar
 deskew
+python-docx
+pandas

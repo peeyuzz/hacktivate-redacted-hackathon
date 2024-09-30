@@ -82,7 +82,7 @@ class Redactor:
         
         return full_text, blocks
 
-    def get_sensitive_data(self, text):
+    def get_sensitive_data(self, text, image):
         if self.plan_type == 'pro':
             with open('prompt.txt', 'r', encoding='utf-8') as file:
                 prompt = file.read()
@@ -91,13 +91,17 @@ class Redactor:
             
             model = genai.GenerativeModel("gemini-1.5-flash")
             response = model.generate_content(
-                f"<DOCUMENT>\n{text}\n</DOCUMENT>\n\n{prompt}",
+                [image, f"<DOCUMENT>\n{text}\n</DOCUMENT>\n\n{prompt}"],
                 safety_settings={
                     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
                     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
                     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
                     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-                })
+                },
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.9,
+                ),
+            )
             
             try:
                 response_text = response.text
@@ -176,8 +180,8 @@ class Redactor:
             image_np = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
             text, text_blocks = self.get_text_with_ocr(image_np)
-            sensitive_data = self.get_sensitive_data(text)
-            
+            sensitive_data = self.get_sensitive_data(text, image)
+            print(sensitive_data)
             locations = self.find_text_locations(text_blocks, sensitive_data)
             locations.extend(self.get_face_and_qr_locations(image_np))
 
@@ -371,6 +375,6 @@ class Redactor:
             print(f"Unsupported file type: {file_extension}")
             return None
 
-path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1).docx"
-redactor = Redactor(path, plan_type="pro", level=["low"])
+path = r"tests\pdfs\Transfer  Posting of officers in JAG of ITS Group ‘A’ - reg.pdf"
+redactor = Redactor(path, plan_type="pro", level=["high", "medium", "low"])
 redactor.redact()
