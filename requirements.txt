@@ -29,4 +29,8 @@ moviepy
 pyzbar
 deskew
 python-docx
+<<<<<<< HEAD
+=======
+openpyxl
+>>>>>>> a91c331fc3cc9f4fd9a6cd55eece1fed9839eeae
 pandas

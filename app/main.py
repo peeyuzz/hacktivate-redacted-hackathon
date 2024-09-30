@@ -5,7 +5,7 @@ from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
@@ -29,6 +29,9 @@ from bson import ObjectId
 from redactor import Redactor
 from routers.auth_routes import router as auth_router
 from models.user_models import FileResponseModel
+from typing import List, Optional
+from pydantic import BaseModel, conlist
+
 
 load_dotenv()
 
@@ -96,6 +99,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# Compression
 
 def compress_image(input_path: str, output_path: str):
     with Image.open(input_path) as img:
@@ -119,8 +123,14 @@ def compress_audio(input_path: str, output_path: str):
     audio.export(output_path, format="mp3", bitrate="128k")
 
 
+
 @app.post("/upload", response_model=FileResponseModel)
-async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+async def upload_file(
+    file: UploadFile = File(...), 
+    special_instructions: Optional[str] = Form(None), 
+    level_of_redaction: Optional[List[str]] = Form(None),
+    current_user: dict = Depends(get_current_user)
+):
     try:
         # Generate a unique identifier for the uploaded file
         unique_id = uuid4().hex
@@ -135,8 +145,8 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
         # logger.debug(f"File saved to {file_path}")
 
         # Perform redaction
-        redactor = Redactor(file_path, plan_type="pro")
-        redacted_path = redactor.redact()
+        redactor = Redactor(file_path, plan_type="pro", special_instructions=special_instructions, level= level_of_redaction)
+        redacted_path = redactor.redact()["output_path"]
         # logger.debug(f"Redacted path: {redacted_path}")
 
         if redacted_path is None or not os.path.exists(redacted_path):
