@@ -86,6 +86,9 @@ class Redactor:
         if self.plan_type == 'pro':
             with open('prompt.txt', 'r', encoding='utf-8') as file:
                 prompt = file.read()
+            
+            if image:
+                prompt += "\nYou have been provided with the screenshot of the page, understand the context of text using the it to better identify which part of text is actually sensitive."
             if self.special_instructions:
                 prompt += f"\n SPECIAL INSTRUCTIONS FROM THE USER, THESE HAVE THE HIGHEST PRIORITY: {self.special_instructions}"
             
@@ -105,7 +108,7 @@ class Redactor:
             
             try:
                 response_text = response.text
-                match = re.search(r"json\n(.*?)\n", response_text, re.DOTALL)
+                match = re.search(r"```json\n(.*?)\n```", response_text, re.DOTALL)
                 if match:
                     json_str = match.group(1).strip()
                     return json.loads(json_str)
@@ -280,7 +283,7 @@ class Redactor:
             
             # Get text and sensitive data (commented out for performance, uncomment if needed)
             # text, text_blocks = self.get_text_with_ocr(zoomed_frame)
-            # sensitive_data = self.get_sensitive_data(text)
+            # sensitive_data = self.get_sensitive_data(text, image)
             # text_locations = self.find_text_locations(text_blocks, sensitive_data)
             
             # Get face locations
@@ -375,6 +378,6 @@ class Redactor:
             print(f"Unsupported file type: {file_extension}")
             return None
 
-# path = r"tests\pdfs\Transfer  Posting of officers in JAG of ITS Group ‘A’ - reg.pdf"
-# redactor = Redactor(path, plan_type="pro", level=["high", "medium", "low"])
-# redactor.redact()
+path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1)_redacted.docx"
+redactor = Redactor(path, plan_type="pro", level=["high", "medium", "low"])
+redactor.redact()
