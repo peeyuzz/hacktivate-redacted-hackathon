@@ -184,7 +184,7 @@ class Redactor:
 
             text, text_blocks = self.get_text_with_ocr(image_np)
             sensitive_data = self.get_sensitive_data(text, image)
-            print(sensitive_data)
+            # print(sensitive_data)
             locations = self.find_text_locations(text_blocks, sensitive_data)
             locations.extend(self.get_face_and_qr_locations(image_np))
 
@@ -219,7 +219,7 @@ class Redactor:
         content = "\n".join([para.text for para in doc.paragraphs])
         
         sensitive_data = self.get_sensitive_data(content)
-        print(sensitive_data)
+        # print(sensitive_data)
         for para in doc.paragraphs:
             for data in sensitive_data:
                 if data['level'] in self.level and data['text'] in para.text:
@@ -378,6 +378,6 @@ class Redactor:
             print(f"Unsupported file type: {file_extension}")
             return None
 
-path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1)_redacted.docx"
-redactor = Redactor(path, plan_type="pro", level=["high", "medium", "low"])
-redactor.redact()
+# path = r"C:\Users\admin\Documents\RMSI itnern\Intern Information Form Filled (1)_redacted.docx"
+# redactor = Redactor(path, plan_type="pro", level=["high", "medium", "low"])
+# redactor.redact()
